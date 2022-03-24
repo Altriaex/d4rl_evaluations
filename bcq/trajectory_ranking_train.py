@@ -4,13 +4,14 @@ import numpy as np
 import os
 import torch
 import shutil
-
+import time
 import d4rl
 import json
 
 import continuous_bcq.BCQ
 import continuous_bcq.utils as utils
 import os.path as osp
+from absl import logging
 
 # Trains BCQ offline
 def train_BCQ(env, state_dim, action_dim, max_action, device, output_dir, args):
@@ -28,7 +29,6 @@ def train_BCQ(env, state_dim, action_dim, max_action, device, output_dir, args):
     h5path = osp.join(data_path, game + ".hdf5")
     dataset = env.get_dataset(h5path=h5path)
     N = dataset['rewards'].shape[0]
-    print('Loading buffer!')
     for i in range(N-1):
         obs = dataset['observations'][i]
         new_obs = dataset['observations'][i+1]
@@ -36,17 +36,18 @@ def train_BCQ(env, state_dim, action_dim, max_action, device, output_dir, args):
         reward = dataset['rewards'][i]
         done_bool = bool(dataset['terminals'][i])
         replay_buffer.add(obs, action, new_obs, reward, done_bool)
-    print('Loaded buffer')
+    logging.info(f'Loaded buffer from {h5path}')
     
     evaluations = []
     training_iters = 0
     while training_iters < args.max_timesteps: 
-        print('Train step:', training_iters)
+        logging.info(f"Training step: {training_iters}")
+        tstart = time.time()
         pol_vals = policy.train(replay_buffer, iterations=int(args.eval_freq), batch_size=args.batch_size)
+        tend = time.time()
         evaluations.append(eval_policy(policy, game, args.seed))
         np.save(os.path.join(output_dir, f"eval_returns.npy"), evaluations)
         training_iters += args.eval_freq
-        print(f"Training iterations: {training_iters}")
         policy.save(output_dir)
 
 
@@ -64,10 +65,7 @@ def eval_policy(policy, env_name, seed, eval_episodes=10):
             state, reward, done, _ = eval_env.step(action)
             avg_reward += reward
     avg_reward /= eval_episodes
-
-    print("---------------------------------------")
-    print(f"Evaluation over {eval_episodes} episodes: {avg_reward:.3f}")
-    print("---------------------------------------")
+    logging.info(f"Evaluation over {eval_episodes} episodes: {avg_reward:.3f}")
     return avg_reward
 
 parser = argparse.ArgumentParser()
@@ -95,6 +93,7 @@ if __name__ == "__main__":
     data_path = osp.join(args.exp_dir, data_folder_name)
     if osp.exists(data_path):
         shutil.rmtree(data_path)    
+    os.makedirs(data_path, exist_ok=True)
     data_file = "_".join([exp_id, game, split, args.method]) + ".zip"
     shutil.copy2(osp.join(exp_base, "preference_rewards", data_file), data_path)
     shutil.unpack_archive(osp.join(data_path, data_file), extract_dir=data_path, format="zip")
