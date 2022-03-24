@@ -74,7 +74,7 @@ flags.DEFINE_string('buffer_name', "Robust", "Prepends name to filename")
 flags.DEFINE_integer('eval_freq', 5000, "How often (time steps) we evaluate")
 flags.DEFINE_integer('max_timesteps', 1000000, "Max time steps to run environment or train for (this defines buffer size)")
 
-flags.DEFINE_integer("start_timesteps", 25000, type="Time steps initial random policy is used before training behavioral")
+flags.DEFINE_integer("start_timesteps", 25000, "Time steps initial random policy is used before training behavioral")
 flags.DEFINE_float("rand_action_p", 0.3, "Probability of selecting random action during batch generation")
 flags.DEFINE_float("gaussian_std", 0.3, "Std of Gaussian exploration noise (Set to 0.1 if DDPG trains poorly)")
 flags.DEFINE_integer("batch_size", 100, "Mini batch size") 
