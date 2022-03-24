@@ -122,5 +122,5 @@ def main(argv):
 
 if __name__ == '__main__':
     flags.mark_flag_as_required('method')
-    flags.mark_flag_as_required('exp_path')
+    flags.mark_flag_as_required('exp_dir')
     app.run(main)
