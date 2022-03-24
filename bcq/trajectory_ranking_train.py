@@ -113,3 +113,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_BCQ(env, state_dim, action_dim, max_action, device, results_dir, args)
     shutil.rmtree(data_path)
+
+    archive_name = osp.join(exp_base, "agents", "_".join([exp_id, game, split, "BCQ", args.method]))
+    shutil.make_archive(base_name=archive_name,
+        root_dir=results_dir, base_dir=None, format="zip")
