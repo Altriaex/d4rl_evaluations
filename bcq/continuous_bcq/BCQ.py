@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import os.path as osp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -119,7 +120,22 @@ class BCQ(object):
 		self.tau = tau
 		self.lmbda = lmbda
 		self.device = device
+	
+	def save(self, model_path):
+		state_dict = {}
+		for key, obj in zip(
+			["actor", "actor_target", "critic", "critic_target", "actor_optimizer", "critic_optimizer", "vae", "vae_optimizer"], 
+			[self.actor, self.actor_target, self.critic, self.critic_target, self.actor_optimizer, self.critic_optimizer, self.vae, self.vae_optimizer]):
+			state_dict[key] = obj.state_dict()
+		torch.save(state_dict, osp.join(model_path, "state_dict.pickle"))
 
+	def load(self, model_path):
+		state_dict = torch.load(
+			osp.join(model_path, "state_dict.pickle"))
+		for key, obj in zip(
+			["actor", "actor_target", "critic", "critic_target", "actor_optimizer", "critic_optimizer", "vae", "vae_optimizer"], 
+			[self.actor, self.actor_target, self.critic, self.critic_target, self.actor_optimizer, self.critic_optimizer, self.vae, self.vae_optimizer]):
+			obj.load_state_dict(state_dict[key])
 
 	def select_action(self, state):		
 		with torch.no_grad():
