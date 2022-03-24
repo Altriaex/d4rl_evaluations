@@ -1,5 +1,7 @@
 import argparse
+from email.policy import default
 import gym
+from matplotlib.pyplot import flag
 import numpy as np
 import os
 import torch
@@ -11,7 +13,7 @@ import json
 import continuous_bcq.BCQ
 import continuous_bcq.utils as utils
 import os.path as osp
-from absl import logging
+from absl import logging, app, flags
 
 # Trains BCQ offline
 def train_BCQ(env, state_dim, action_dim, max_action, device, output_dir, args):
@@ -67,25 +69,26 @@ def eval_policy(policy, env_name, seed, eval_episodes=10):
     avg_reward /= eval_episodes
     logging.info(f"Evaluation over {eval_episodes} episodes: {avg_reward:.3f}")
     return avg_reward
+flags.DEFINE_integer('seed', 0, "Sets Gym, PyTorch and Numpy seeds")
+flags.DEFINE_string('buffer_name', "Robust", "Prepends name to filename")
+flags.DEFINE_integer('eval_freq', 5000, "How often (time steps) we evaluate")
+flags.DEFINE_integer('max_timesteps', 1000000, "Max time steps to run environment or train for (this defines buffer size)")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--seed", default=0, type=int)              # Sets Gym, PyTorch and Numpy seeds
-parser.add_argument("--buffer_name", default="Robust")          # Prepends name to filename
-parser.add_argument("--eval_freq", default=5e3, type=float)     # How often (time steps) we evaluate
-parser.add_argument("--max_timesteps", default=1e6, type=int)   # Max time steps to run environment or train for (this defines buffer size)
-parser.add_argument("--start_timesteps", default=25e3, type=int)# Time steps initial random policy is used before training behavioral
-parser.add_argument("--rand_action_p", default=0.3, type=float) # Probability of selecting random action during batch generation
-parser.add_argument("--gaussian_std", default=0.3, type=float)  # Std of Gaussian exploration noise (Set to 0.1 if DDPG trains poorly)
-parser.add_argument("--batch_size", default=100, type=int)      # Mini batch size for networks
-parser.add_argument("--discount", default=0.99)                 # Discount factor
-parser.add_argument("--tau", default=0.005)                     # Target network update rate
-parser.add_argument("--lmbda", default=0.75)                    # Weighting for clipped double Q-learning in BCQ
-parser.add_argument("--phi", default=0.05)                      # Max perturbation hyper-parameter for BCQ
-parser.add_argument("--exp_dir", default="", type=str)
-parser.add_argument("--method", default="", type=str)
+flags.DEFINE_integer("start_timesteps", 25000, type="Time steps initial random policy is used before training behavioral")
+flags.DEFINE_float("rand_action_p", 0.3, "Probability of selecting random action during batch generation")
+flags.DEFINE_float("gaussian_std", 0.3, "Std of Gaussian exploration noise (Set to 0.1 if DDPG trains poorly)")
+flags.DEFINE_integer("batch_size", 100, "Mini batch size") 
+flags.DEFINE_float("discount", 0.99, "Discount factor")     
+flags.DEFINE_float("tau", 0.005, "Target network update rate")
+flags.DEFINE_float("lmbda", 0.75, "Weighting for clipped double Q-learning in BCQ")
+flags.DEFINE_float("phi", 0.05, "Max perturbation hyper-parameter for BCQ")
+flags.DEFINE_string("exp_dir", None, "path to experiments")
+flags.DEFINE_string("method", None, "the reward learning method")
 
-if __name__ == "__main__":
-    args = parser.parse_args()
+args = flags.FLAGS
+
+def main(argv):
+    logging.set_verbosity(logging.INFO)
     path, split = osp.split(args.exp_dir)
     path, game = osp.split(path)
     exp_base, exp_id = osp.split(path)
@@ -116,3 +119,8 @@ if __name__ == "__main__":
     archive_name = osp.join(exp_base, "agents", "_".join([exp_id, game, split, "BCQ", args.method]))
     shutil.make_archive(base_name=archive_name,
         root_dir=results_dir, base_dir=None, format="zip")
+
+if __name__ == '__main__':
+    flags.mark_flag_as_required('method')
+    flags.mark_flag_as_required('exp_path')
+    app.run(main)
