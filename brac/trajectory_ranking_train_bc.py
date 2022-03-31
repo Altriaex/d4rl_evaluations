@@ -62,7 +62,7 @@ def main(_):
           FLAGS.game,
           FLAGS.split,
           "BC")
-    """model_arch = ((200,200),)
+    model_arch = ((200,200),)
     opt_params = (('adam', 5e-4),)
     utils.maybe_makedirs(log_dir)
     train_eval_offline.train_eval_offline(
@@ -76,7 +76,7 @@ def main(_):
       model_params=model_arch,
       optimizers=opt_params,
       seed=int(FLAGS.split),
-      use_seed_for_data=True)"""
+      use_seed_for_data=True)
     exp_base, exp_id = osp.split(FLAGS.exp_path)
     archive_name = osp.join(
         exp_base, "agents", "_".join([exp_id, FLAGS.game, FLAGS.split, "BC"]))
