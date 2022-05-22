@@ -112,9 +112,13 @@ class Agent(agent.Agent):
     return tf.add_n(norms)
 
   def ensemble_q(self, qs):
-    lambda_ = self._ensemble_q_lambda
-    return (lambda_ * tf.reduce_min(qs, axis=-1)
-            + (1 - lambda_) * tf.reduce_max(qs, axis=-1))
+    #lambda_ = self._ensemble_q_lambda
+    #return (lambda_ * tf.reduce_min(qs, axis=-1)
+    #        + (1 - lambda_) * tf.reduce_max(qs, axis=-1))
+    weights = tf.random.uniform(shape=qs.shape)
+    weights = tf.nn.softmax(weights, axis=-1)
+    q = tf.reduce_sum(qs * weights, axis=-1)
+    return q
 
   def _ensemble_q2_target(self, q2_targets):
     return self.ensemble_q(q2_targets)
@@ -137,15 +141,18 @@ class Agent(agent.Agent):
       q1_preds.append(q1_pred)
       q2_targets.append(q2_target_)
     q2_targets = tf.stack(q2_targets, axis=-1)
-    q2_target = self._ensemble_q2_target(q2_targets)
-    v2_target = q2_target - self._get_alpha_entropy() * log_pi_a2_p
+    #q2_target = self._ensemble_q2_target(q2_targets)
+    q2_target = q2_targets
     if self._value_penalty:
       div_estimate = self._div_estimate(s2)
-      v2_target = v2_target - self._get_alpha() * div_estimate
-    q1_target = tf.stop_gradient(r + dsc * self._discount * v2_target)
+      v2_target = q2_target - self._get_alpha() * div_estimate[:, None]
+    else:
+      v2_target = q2_target
+    q1_target = tf.stop_gradient(r[:, None] + dsc[:, None] * self._discount * v2_target)
     q_losses = []
-    for q1_pred in q1_preds:
-      q_loss_ = tf.reduce_mean(tf.square(q1_pred - q1_target))
+    for ind, q1_pred in enumerate(q1_preds):
+      #q_loss_ = tf.reduce_mean(tf.square(q1_pred - q1_target))
+      q_loss_ = tf.losses.huber_loss(q1_target[:, ind], q1_pred)
       q_losses.append(q_loss_)
     q_loss = tf.add_n(q_losses)
     q_w_norm = self._get_q_weight_norm()
@@ -176,9 +183,7 @@ class Agent(agent.Agent):
         tf.greater(self._global_step, self._warm_start),
         tf.float32)
     p_loss = tf.reduce_mean(
-        self._get_alpha_entropy() * log_pi_a_p
-        + self._get_alpha() * div_estimate
-        - q1 * q_start)
+        self._get_alpha() * div_estimate - q1 * q_start)
     p_w_norm = self._get_p_weight_norm()
     norm_loss = self._weight_decays[1] * p_w_norm
     loss = p_loss + norm_loss
@@ -194,7 +199,7 @@ class Agent(agent.Agent):
     s = batch['s1']
     alpha = self._get_alpha()
     div_estimate = self._div_estimate(s)
-    a_loss = - tf.reduce_mean(alpha * (div_estimate - self._target_divergence))
+    a_loss = - tf.reduce_mean(alpha * (tf.nn.relu(div_estimate - self._target_divergence)))
     # info
     info = collections.OrderedDict()
     info['a_loss'] = a_loss
@@ -237,15 +242,13 @@ class Agent(agent.Agent):
       self._update_target_fns(source_vars, target_vars)
     q_info = self._optimize_q(batch)
     p_info = self._optimize_p(batch)
-    if self._train_alpha:
-      a_info = self._optimize_a(batch)
-    if self._train_alpha_entropy:
-      ae_info = self._optimize_ae(batch)
     info.update(p_info)
     info.update(q_info)
     if self._train_alpha:
+      a_info = self._optimize_a(batch)
       info.update(a_info)
     if self._train_alpha_entropy:
+      ae_info = self._optimize_ae(batch)
       info.update(ae_info)
     return info
 
@@ -351,8 +354,9 @@ class AgentModule(agent.AgentModule):
     self._alpha_entropy_var = tf.Variable(1.0)
 
   def get_alpha(self, alpha_max=ALPHA_MAX):
-    return utils.clip_v2(
-        self._alpha_var, 0.0, alpha_max)
+    clip_v2 = utils.Clip_v2(0.0, alpha_max)
+    #return utils.clip_v2(self._alpha_var)
+    return clip_v2(self._alpha_var)
 
   def get_alpha_entropy(self):
     return utils.relu_v2(self._alpha_entropy_var)

@@ -41,10 +41,10 @@ from tf_agents.environments import tf_py_environment
 from tf_agents.environments import gym_wrapper
 
 
-def get_offline_data(tf_env):
+def get_offline_data(tf_env, data_file=None):
   gym_env = tf_env.pyenv.envs[0]
   #offline_dataset = gym_env.unwrapped.get_dataset()
-  offline_dataset = gym_env.get_dataset()
+  offline_dataset = gym_env.get_dataset(h5path=data_file)
   dataset_size = len(offline_dataset['observations'])
   tf_dataset = dataset.Dataset(
       tf_env.observation_spec(),
@@ -83,8 +83,9 @@ def get_offline_data(tf_env):
   return tf_dataset
 
 
-def env_factory(env_name):
+def env_factory(env_name, seed=0):
   gym_env = gym.make(env_name)
+  gym_env.seed(seed)
   gym_spec = gym.spec(env_name)
   if gym_spec.max_episode_steps in [0, None]:  # Add TimeLimit wrapper.
     gym_env = time_limit.TimeLimit(gym_env, max_episode_steps=1000)
@@ -117,13 +118,14 @@ def train_eval_offline(
     behavior_ckpt_file=None,
     value_penalty=True,
     alpha=1.0,
-    #model_params=((200, 200),),
     optimizers=(('adam', 0.001),),
     batch_size=256,
     weight_decays=(0.0,),
     update_freq=1,
     update_rate=0.005,
     discount=0.99,
+    n_div_samples=10,
+    train_alpha=False
     ):
   """Training a policy with a fixed dataset."""
   # Create tf_env to get specs.
@@ -134,21 +136,29 @@ def train_eval_offline(
   print('[train_eval_offline.py] optimizers=', optimizers)
   print('[train_eval_offline.py] bckpt_file=', behavior_ckpt_file)
   print('[train_eval_offline.py] value_penalty=', value_penalty)
-
-  tf_env = env_factory(env_name)
+  print('[train_eval_offline.py] train_alpha=', train_alpha)
+  
+  if use_seed_for_data:
+    tf.set_random_seed(0)
+    np.random.seed(seed)
+    rand = np.random.RandomState(seed)
+    tf_env = env_factory(env_name, seed=seed)
+  else:
+    tf.set_random_seed(0)
+    np.random.seed(0)
+    rand = np.random.RandomState(0)
+    tf_env = env_factory(env_name, seed=0)
   observation_spec = tf_env.observation_spec()
   action_spec = tf_env.action_spec()
 
   # Prepare data.
-  full_data = get_offline_data(tf_env)
+  full_data = get_offline_data(tf_env, data_file)
 
   # Split data.
   n_train = min(n_train, full_data.size)
   logging.info('n_train %s.', n_train)
-  if use_seed_for_data:
-    rand = np.random.RandomState(seed)
-  else:
-    rand = np.random.RandomState(0)
+  
+    
   shuffled_indices = utils.shuffle_indices_with_steps(
       n=full_data.size, steps=shuffle_steps, rand=rand)
   train_indices = shuffled_indices[:n_train]
@@ -174,6 +184,9 @@ def train_eval_offline(
       my_agent_arg_dict['behavior_ckpt_file'] = behavior_ckpt_file
       my_agent_arg_dict['value_penalty'] = value_penalty
       my_agent_arg_dict['alpha'] = alpha
+      my_agent_arg_dict['n_div_samples'] = n_div_samples
+      my_agent_arg_dict['train_alpha'] = train_alpha
+      my_agent_arg_dict['target_divergence'] = 0.05
   print('agent:', agent_module.__name__)
   print('agent_args:', my_agent_arg_dict)
   #agent = agent_module.Agent(**vars(agent_args))

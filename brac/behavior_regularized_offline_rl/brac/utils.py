@@ -94,7 +94,6 @@ def soft_relu(x):
   #       log(1 - sigmoid(x)) = - soft_relu(x)
   return tf.log(1.0 + tf.exp(-tf.abs(x))) + tf.maximum(x, 0.0)
 
-
 @tf.custom_gradient
 def relu_v2(x):
   """Relu with modified gradient behavior."""
@@ -106,6 +105,24 @@ def relu_v2(x):
   return value, grad
 
 
+class Clip_v2(object):
+    def __init__(self, low, high):
+        self.low = low
+        self.high = high
+    
+    @tf.custom_gradient
+    def new_grad(self, x):
+        #x_ = tf.identity(x)
+        def grad(dy):
+            if_y_pos = tf.cast(tf.greater(dy, 0.0), tf.float32)
+            if_x_g_low = tf.cast(tf.greater(x, self.low), tf.float32)
+            if_x_l_high = tf.cast(tf.less(x, self.high), tf.float32)
+            return (if_y_pos * if_x_g_low + (1.0 - if_y_pos) * if_x_l_high) * dy
+        return x, grad
+        
+    def __call__(self, x):
+        return self.new_grad(x)
+    
 @tf.custom_gradient
 def clip_v2(x, low, high):
   """Clipping with modified gradient behavior."""
