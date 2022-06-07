@@ -113,12 +113,13 @@ class Clip_v2(object):
     @tf.custom_gradient
     def new_grad(self, x):
         #x_ = tf.identity(x)
+        value = tf.minimum(tf.maximum(x, self.low), self.high)
         def grad(dy):
             if_y_pos = tf.cast(tf.greater(dy, 0.0), tf.float32)
             if_x_g_low = tf.cast(tf.greater(x, self.low), tf.float32)
             if_x_l_high = tf.cast(tf.less(x, self.high), tf.float32)
             return (if_y_pos * if_x_g_low + (1.0 - if_y_pos) * if_x_l_high) * dy
-        return x, grad
+        return value, grad
         
     def __call__(self, x):
         return self.new_grad(x)

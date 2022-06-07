@@ -120,12 +120,13 @@ def train_eval_offline(
     alpha=1.0,
     optimizers=(('adam', 0.001),),
     batch_size=256,
-    weight_decays=(0.0,),
+    weight_decays=(0,),
     update_freq=1,
     update_rate=0.005,
     discount=0.99,
     n_div_samples=10,
-    train_alpha=False
+    train_alpha=False,
+    warm_start=20000
     ):
   """Training a policy with a fixed dataset."""
   # Create tf_env to get specs.
@@ -187,6 +188,7 @@ def train_eval_offline(
       my_agent_arg_dict['n_div_samples'] = n_div_samples
       my_agent_arg_dict['train_alpha'] = train_alpha
       my_agent_arg_dict['target_divergence'] = 0.05
+      my_agent_arg_dict['warm_start'] = warm_start
   print('agent:', agent_module.__name__)
   print('agent_args:', my_agent_arg_dict)
   #agent = agent_module.Agent(**vars(agent_args))
